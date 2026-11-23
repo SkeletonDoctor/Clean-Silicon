@@ -437,7 +437,7 @@ struct LensPage: View {
 
     var body: some View {
         PageScroll {
-            PageHeader(title: "Space Lens", subtitle: "Drill into any folder to see exactly where the space went") {
+            PageHeader(title: "Space Lens", subtitle: "A map of where the space went. Bigger blocks are bigger folders.") {
                 HStack(spacing: 8) {
                     if lens.loading { ProgressView().controlSize(.small) }
                     Button { lens.refresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
@@ -461,6 +461,8 @@ struct LensPage: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 4) {
+                    Button { if let up = lens.parent { lens.open(up) } } label: { Image(systemName: "chevron.up") }
+                        .buttonStyle(IconButtonStyle()).disabled(lens.parent == nil).opacity(lens.parent == nil ? 0.4 : 1).help("Go up one folder").padding(.trailing, 6)
                     Button { lens.open(URL(fileURLWithPath: "/")) } label: { Image(systemName: "internaldrive.fill") }.buttonStyle(.plain).foregroundStyle(.white.opacity(0.6))
                     ForEach(lens.crumbs, id: \.path) { u in
                         Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold)).foregroundStyle(.white.opacity(0.35))
@@ -473,22 +475,7 @@ struct LensPage: View {
                 }
                 .padding(.horizontal, 6).padding(.bottom, 4)
 
-                if lens.total > 0 {
-                    let top = Array(lens.entries.prefix(6))
-                    let rest = lens.total - top.reduce(0) { $0 + ($1.size ?? 0) }
-                    DistributionBar(parts: top.enumerated().map { (Palette.ranked[$0.offset], $0.element.size ?? 0) } + [(.white.opacity(0.25), rest)], height: 14)
-                        .padding(.horizontal, 6)
-                    HStack(spacing: 14) {
-                        ForEach(Array(top.enumerated()), id: \.element.id) { i, e in
-                            HStack(spacing: 5) {
-                                Circle().fill(Palette.ranked[i]).frame(width: 7, height: 7)
-                                Text(e.name).font(.system(size: 11, weight: .medium)).foregroundStyle(.white.opacity(0.7)).lineLimit(1)
-                            }
-                        }
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.horizontal, 6).padding(.bottom, 6)
-                }
+                TreemapView()
                 if lens.denied {
                     Text("macOS blocked this folder. Turn on Full Disk Access for Clean Silicon to look inside.")
                         .font(.system(size: 12)).foregroundStyle(.white.opacity(0.6)).padding(20).frame(maxWidth: .infinity)

@@ -34,6 +34,29 @@ enum Disk {
         return total
     }
 
+    /// Size of `url` plus the sizes of the items directly inside it, largest first.
+    /// Other volumes mounted inside are skipped, as `treeSize` does.
+    static func measure(_ url: URL, cancelled: () -> Bool = { false }) -> (size: Int64, kids: [LensKid]) {
+        var st = stat()
+        guard lstat(url.path, &st) == 0, (st.st_mode & S_IFMT) == S_IFDIR,
+              let names = try? FileManager.default.contentsOfDirectory(atPath: url.path)
+        else { return (treeSize(url, cancelled: cancelled), []) }
+        var total = Int64(st.st_blocks) * 512
+        var kids: [LensKid] = []
+        for name in names {
+            if cancelled() { break }
+            let child = url.appendingPathComponent(name)
+            var cs = stat()
+            guard lstat(child.path, &cs) == 0, cs.st_dev == st.st_dev else { continue }
+            let isDir = (cs.st_mode & S_IFMT) == S_IFDIR
+            let size = isDir ? treeSize(child, cancelled: cancelled) : Int64(cs.st_blocks) * 512
+            total += size
+            kids.append(LensKid(path: child.path, name: name, isDirectory: isDir, size: size))
+        }
+        kids.sort { $0.size > $1.size }
+        return (total, Array(kids.prefix(200)))
+    }
+
     static func children(_ url: URL) -> [URL] {
         (try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil, options: [])) ?? []
     }
@@ -337,10 +360,19 @@ final class CleanerModel {
 
 // MARK: - Space Lens
 
+struct LensKid: Sendable {
+    let path: String
+    let name: String
+    let isDirectory: Bool
+    let size: Int64
+}
+
 struct LensEntry: Identifiable {
     let url: URL
     let isDirectory: Bool
     var size: Int64?
+    /// The largest items inside, for the treemap's second level.
+    var kids: [LensKid] = []
     var id: String { url.path }
     var name: String { url.lastPathComponent }
 }
@@ -352,6 +384,7 @@ final class LensModel {
     var loading = false
     var denied = false
     @ObservationIgnored private var cache: [String: Int64] = [:]
+    @ObservationIgnored private var kidCache: [String: [LensKid]] = [:]
     @ObservationIgnored private var task: Task<Void, Never>?
 
     static let presets: [(String, String, URL)] = [
@@ -365,6 +398,8 @@ final class LensModel {
 
     var total: Int64 { entries.reduce(0) { $0 + ($1.size ?? 0) } }
     var largest: Int64 { entries.compactMap(\.size).max() ?? 0 }
+    var measured: Int { entries.reduce(0) { $0 + ($1.size == nil ? 0 : 1) } }
+    var parent: URL? { current.standardizedFileURL.path == "/" ? nil : current.standardizedFileURL.deletingLastPathComponent() }
     var crumbs: [URL] {
         var out: [URL] = [], u = current.standardizedFileURL
         while u.path != "/" { out.insert(u, at: 0); u = u.deletingLastPathComponent() }
@@ -380,24 +415,25 @@ final class LensModel {
         denied = listing == nil
         let list = (listing ?? []).map { u -> LensEntry in
             let v = try? u.resourceValues(forKeys: Set(keys))
-            return LensEntry(url: u, isDirectory: (v?.isDirectory ?? false) && !(v?.isSymbolicLink ?? false), size: cache[u.path])
+            return LensEntry(url: u, isDirectory: (v?.isDirectory ?? false) && !(v?.isSymbolicLink ?? false), size: cache[u.path], kids: Array((kidCache[u.path] ?? []).prefix(14)))
         }
         withAnimation(.snappy) { entries = list.sorted { ($0.size ?? -1) > ($1.size ?? -1) } }
-        let pending = list.filter { $0.size == nil }.map(\.url)
+        // Folders whose size is known from the level above still need their contents measured for the map.
+        let pending = list.filter { $0.size == nil || ($0.isDirectory && kidCache[$0.id] == nil) }.map(\.url)
         task = Task { [weak self] in
-            await withTaskGroup(of: (String, Int64).self) { group in
+            await withTaskGroup(of: (String, Int64, [LensKid]).self) { group in
                 var it = pending.makeIterator()
                 var running = 0
                 func add() {
                     guard let u = it.next() else { return }
                     running += 1
-                    group.addTask { (u.path, Disk.treeSize(u) { Task.isCancelled }) }
+                    group.addTask { let m = Disk.measure(u) { Task.isCancelled }; return (u.path, m.size, m.kids) }
                 }
                 for _ in 0..<6 { add() }
-                while running > 0, let (path, size) = await group.next() {
+                while running > 0, let (path, size, kids) = await group.next() {
                     running -= 1
                     if Task.isCancelled { break }
-                    self?.finish(path, size, in: url)
+                    self?.finish(path, size, kids, in: url)
                     add()
                 }
                 group.cancelAll()
@@ -406,11 +442,14 @@ final class LensModel {
         }
     }
 
-    private func finish(_ path: String, _ size: Int64, in folder: URL) {
+    private func finish(_ path: String, _ size: Int64, _ kids: [LensKid], in folder: URL) {
         cache[path] = size
+        kidCache[path] = kids
+        for k in kids { cache[k.path] = k.size }
         guard folder == current, let i = entries.firstIndex(where: { $0.id == path }) else { return }
         withAnimation(.spring(duration: 0.45)) {
             entries[i].size = size
+            entries[i].kids = Array(kids.prefix(14))
             entries.sort { ($0.size ?? -1) > ($1.size ?? -1) }
         }
     }
@@ -418,20 +457,20 @@ final class LensModel {
     func trash(_ entry: LensEntry) {
         guard (try? FileManager.default.trashItem(at: entry.url, resultingItemURL: nil)) != nil else { NSSound.beep(); return }
         // The item and every folder above it now have a different size.
-        cache[entry.id] = nil
+        cache[entry.id] = nil; kidCache[entry.id] = nil
         var up = entry.url.deletingLastPathComponent().standardizedFileURL
-        while up.path != "/" { cache[up.path] = nil; up = up.deletingLastPathComponent() }
+        while up.path != "/" { cache[up.path] = nil; kidCache[up.path] = nil; up = up.deletingLastPathComponent() }
         open(current)
     }
 
     /// Call after anything else deletes files, so the next look at a folder is measured fresh.
     func invalidate() {
-        cache.removeAll()
+        cache.removeAll(); kidCache.removeAll()
         if !entries.isEmpty { open(current) }
     }
 
     func refresh() {
-        for e in entries { cache[e.id] = nil }
+        for e in entries { cache[e.id] = nil; kidCache[e.id] = nil }
         open(current)
     }
 }

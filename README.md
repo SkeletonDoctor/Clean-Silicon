@@ -7,7 +7,7 @@ A native macOS app for Apple silicon Macs that frees disk space and shows what t
 ## What it does
 
 - **Cleaner**: finds caches, logs, Xcode and developer leftovers, iOS backups, old installers, simulators, duplicates and large files, and lets you choose what goes.
-- **Space Lens**: browse any folder by size and move items to the Trash.
+- **Space Lens**: a treemap of any folder, where bigger blocks are bigger folders and each block shows what is inside it. Click to zoom in, and move items to the Trash.
 - **Uninstaller**: remove an app together with its leftover files.
 - **Monitor**: live CPU and GPU load, clock speeds, power in watts, temperatures, memory, network, battery and the busiest processes. Also available from the menu bar.
 - **Stress Test**: load CPU, GPU, memory and disk together, with per-second telemetry, throttling warnings and a `.log` plus `.csv` for every run.
