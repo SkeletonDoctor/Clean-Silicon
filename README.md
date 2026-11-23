@@ -13,11 +13,13 @@ A native macOS app for Apple silicon Macs that frees disk space and shows what t
 - **Stress Test**: load CPU, GPU, memory and disk together, with per-second telemetry, throttling warnings and a `.log` plus `.csv` for every run.
 - **Specs**: everything about the hardware in one place.
 
+| Space Lens | Cleaner |
+|---|---|
+| ![Space Lens](docs/lens.png) | ![Cleaner](docs/cleaner.png) |
+
 | Monitor | Stress Test |
 |---|---|
 | ![Monitor](docs/monitor.png) | ![Stress Test](docs/stress.png) |
-
-![Cleaner](docs/cleaner.png)
 
 ## Requirements
 
