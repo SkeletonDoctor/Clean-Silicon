@@ -247,12 +247,12 @@ struct UpdateRow: View {
             switch updater.phase {
             case .ready(let r):
                 Button { updater.installAndRelaunch() } label: {
-                    Label("Restart to update to \(r.version)", systemImage: "arrow.down.circle.fill")
-                        .font(.system(size: 11.5, weight: .semibold)).foregroundStyle(Palette.mint)
+                    Label("Restart to update", systemImage: "arrow.down.circle.fill")
+                        .font(.system(size: 11.5, weight: .semibold)).foregroundStyle(Palette.mint).lineLimit(1)
                         .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help("The update is downloaded and verified. It also installs by itself the next time you quit.")
+                .help("Version \(r.version) is downloaded and verified. It also installs by itself the next time you quit.")
             case .available(let r):
                 Button { Task { await updater.download(r) } } label: {
                     Label("Get version \(r.version)", systemImage: "arrow.down.circle")
