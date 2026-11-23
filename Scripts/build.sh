@@ -39,9 +39,18 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </dict></plist>
 PLIST
 xattr -cr "$APP"
-# A real certificate keeps Full Disk Access granted across rebuilds; ad-hoc signing resets it every time.
-IDENTITY=$(security find-identity -v -p codesigning | awk '/Developer ID Application|Apple Development/ {print $2; exit}')
-codesign --force --sign "${IDENTITY:--}" "$APP"
+# A stable certificate keeps Full Disk Access granted across rebuilds and updates; ad-hoc signing resets it
+# every time. Release builds use the self-signed "Clean Silicon" certificate in its own keychain when it
+# exists (nothing personal in it); otherwise a developer certificate, otherwise ad-hoc.
+KEYCHAIN="$HOME/Library/Keychains/cleansilicon-signing.keychain-db"
+PASSFILE="$HOME/.config/cleansilicon/keychain_password"
+if [[ -f "$KEYCHAIN" && -f "$PASSFILE" ]]; then
+  security unlock-keychain -p "$(cat "$PASSFILE")" "$KEYCHAIN"
+  codesign --force --sign "Clean Silicon" --keychain "$KEYCHAIN" "$APP"
+else
+  IDENTITY=$(security find-identity -v -p codesigning | awk '/Developer ID Application|Apple Development/ {print $2; exit}')
+  codesign --force --sign "${IDENTITY:--}" "$APP"
+fi
 rm -rf "build/Clean Silicon.app"
 ditto "$APP" "build/Clean Silicon.app"
 echo "Built build/Clean Silicon.app"
