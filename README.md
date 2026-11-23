@@ -2,6 +2,8 @@
 
 A native macOS app for Apple silicon Macs that frees disk space and shows what the machine is doing, built with SwiftUI and Liquid Glass.
 
+![Clean Silicon overview](docs/overview.png)
+
 ## What it does
 
 - **Cleaner**: finds caches, logs, Xcode and developer leftovers, iOS backups, old installers, simulators, duplicates and large files, and lets you choose what goes.
@@ -10,6 +12,12 @@ A native macOS app for Apple silicon Macs that frees disk space and shows what t
 - **Monitor**: live CPU and GPU load, clock speeds, power in watts, temperatures, memory, network, battery and the busiest processes. Also available from the menu bar.
 - **Stress Test**: load CPU, GPU, memory and disk together, with per-second telemetry, throttling warnings and a `.log` plus `.csv` for every run.
 - **Specs**: everything about the hardware in one place.
+
+| Monitor | Stress Test |
+|---|---|
+| ![Monitor](docs/monitor.png) | ![Stress Test](docs/stress.png) |
+
+![Cleaner](docs/cleaner.png)
 
 ## Requirements
 
@@ -38,3 +46,7 @@ This builds `build/Clean Silicon.app` and copies it to `/Applications`.
 ## Releasing
 
 Bump `VERSION`, commit, then run `./Scripts/release.sh "Release notes"`. Releases are signed with a private key kept outside the repository (`swift Scripts/sign_update.swift keygen` creates one). If you fork the project, change `repository` and `publicKey` in `Sources/CleanSilicon/Updater.swift`.
+
+## License
+
+[MIT](LICENSE)
