@@ -290,10 +290,10 @@ struct UpdateRow: View {
     }
     private func status(_ version: String) -> String {
         switch updater.phase {
-        case .checking: "Checking for updates…"
-        case .downloading(let r, let p): "Downloading \(r.version) · \(Int(p * 100))%"
-        case .upToDate: "Version \(version) · up to date"
-        case .failed: "Update check failed"
+        case .checking: "Checking…"
+        case .downloading(let r, let p): "Updating · \(Int(p * 100))%"
+        case .upToDate: "v\(version) · Up to date"
+        case .failed: "Update failed"
         default: "Version \(version)"
         }
     }
